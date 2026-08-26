@@ -1,0 +1,137 @@
+base_images:
+  ocp_4.20_base-rhel9:
+    name: "4.20"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_4.21_base-rhel9:
+    name: "4.21"
+    namespace: ocp
+    tag: base-rhel9
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.21
+images:
+  items:
+  - context_dir: .
+    dockerfile_path: test/integration/Dockerfile
+    inputs:
+      ocp_4.21_base-rhel9:
+        as:
+        - registry.access.redhat.com/ubi9/ubi-minimal:latest
+    to: lvm-operator-integration-test
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-sno-y-stream-upgrade
+  run_if_changed: releases/lvm-operator-.*
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.20
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_SOURCE: redhat-operators
+      LVMS_NAMESPACE: openshift-lvm-storage
+      TARGET_LVMS_CHANNEL: stable-4.21
+      ZSTREAM_VERSION: "4.21"
+    pre:
+    - as: lvms-pre-upgrade-test
+      cli: initial
+      commands: |
+        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_pre_upgrade.xml openshift/lvm-operator/test/integration/qe_tests/sno
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      timeout: 2h0m0s
+    test:
+    - as: openshift-upgrade-qe-sanity
+      commands: echo "Upgrade test"
+      resources:
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      timeout: 2h0m0s
+    post:
+    - as: lvms-post-upgrade-test
+      cli: latest
+      commands: |
+        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_post_upgrade.xml openshift/lvm-operator/test/integration/qe_tests/sno
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      timeout: 2h0m0s
+    workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
+- as: e2e-aws-mno-y-stream-upgrade
+  run_if_changed: releases/lvm-operator-.*
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.20
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_SOURCE: redhat-operators
+      LVMS_NAMESPACE: openshift-lvm-storage
+      TARGET_LVMS_CHANNEL: stable-4.21
+      ZSTREAM_VERSION: "4.21"
+    pre:
+    - as: lvms-pre-upgrade-test
+      cli: initial
+      commands: |
+        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_pre_upgrade.xml openshift/lvm-operator/test/integration/qe_tests/mno
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      timeout: 2h0m0s
+    test:
+    - as: openshift-upgrade-qe-sanity
+      commands: echo "Upgrade test"
+      resources:
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      timeout: 2h0m0s
+    post:
+    - as: lvms-post-upgrade-test
+      cli: latest
+      commands: |
+        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_post_upgrade.xml openshift/lvm-operator/test/integration/qe_tests/mno
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      timeout: 2h0m0s
+    workflow: cucushift-installer-rehearse-aws-ipi-mno-lvms
+zz_generated_metadata:
+  branch: release-management
+  org: openshift
+  repo: lvm-operator
+  variant: y-upgrade-4.20
